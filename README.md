@@ -90,6 +90,8 @@ art/cut/sheet.png 9 個候選主角的總覽圖
 
 ## 美術：做到哪裡、下一步
 
+章節 1 的王（炎星族長 拉卡）改用委託繪製的像素 sprite 表，來源是截圖 `2.png`。切好的 atlas 以 base64 內嵌在 `index.html` 的 `BOSS1` 常數中（同檔內附各動作影格座標與錨點）。影格數：idle 6、walk 9、attack 5、special 10、hurt 6。姿態對應：idle → idle（6 fps 循環）；walk → walk（10 fps 循環）；wind／punch → attack，依攻擊進度播放；spread／dash／rain → special，依攻擊進度播放；stun／die → hurt，播一次後停在最後一格。
+
 ### 已確定的設計決定
 
 - 主角是**原創角色**，不能做成任何現有作品的角色（例如七龍珠的布羅利）或其招牌元素（綠色刺蝟頭、金色頭冠護腕、白色寬褲加紅腰布、猴子尾巴、賽亞人戰鬥服）。
