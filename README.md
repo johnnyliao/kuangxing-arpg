@@ -1,6 +1,6 @@
 # 辦公室格鬥傳
 
-單一 HTML 檔的 2D 橫向動作 roguelike。被壓榨的工程師凱嵐，今天要讓整間公司安靜下來：依序打倒八婆、肥婆、屌毛，最後是胖子。
+單一 HTML 檔的 2D 橫向動作 roguelike。被壓榨的工程師羅利，今天要讓整間公司安靜下來：依序打倒八婆、肥婆、屌毛，最後是胖子。（已整合主角羅利動作圖集、特效與日文語音）
 
 - 線上版（舊版「狂星破滅」，私人，需要在 claude.ai 用 Share 開放權限，尚未更新）：https://claude.ai/artifact/RaGLnsSJq5GTndBnJHcTV7
 - 本機遊玩：直接用瀏覽器打開 `index.html`，不需要建置或安裝任何東西
@@ -8,7 +8,9 @@
 ## 目錄
 
 ```
-index.html        遊戲本體（HTML + CSS + JS 全在這一個檔案，約 860 行，其中四段 base64 sprite 佔大部分）
+index.html        遊戲本體（HTML + CSS + JS 全在這一個檔案，四位魔王 base64 sprite + 主角羅利 sprite 渲染）
+art/roli-v1/      主角羅利動作圖集（roli-actions-v1.png）與特效圖集（roli-effects-v1.png）
+audio/            主角日文戰鬥語音包（voice-pack.js 與 14 組 game/*.mp3 片段）
 art/concept/      第一批 AI 設定圖（a_* 動畫風、b_* 格鬥遊戲風），尚未使用
 art/cut/          白底生圖與去背結果（*_cut.png 是透明背景），尚未接進遊戲
 art/cut/sheet.png 9 個候選主角的總覽圖（舊版狂戰士方向，已不採用）
@@ -111,7 +113,7 @@ art/cut/sheet.png 9 個候選主角的總覽圖（舊版狂戰士方向，已不
 - 四章、結局、語音、手機操作都可以完整玩完。2026-11-13 headless 冒煙測試（四章，每章打王、命中特效、通關、結局）0 console 錯誤。
 - Roguelike 版（分支 `roguelike`）另有冒煙測試：抽強化、章節過渡、死亡、最佳紀錄都跑過，沒有 console 錯誤。
 - 語音與打擊手感沒有真人測過。
-- **美術缺口**：四位魔王已是 sprite；小怪與主角仍是程式畫的幾何圖形。
+- **美術狀態**：四位魔王已是 sprite；主角已替換為羅利專屬 sprite 與能量特效；小怪維持幾何圖形。
 
 ## 美術
 
