@@ -895,7 +895,7 @@ function drawPlay(){
   for(const pr of proj){
     if(pr.shotKind)continue;
     const y=pr.y-pr.z,r=pr.r;
-    if(pr.owner==='p'&&energy(pr.ult?5:1,pr.ult?Math.floor(G.time*8)%3:Math.floor(G.time*10)%6,pr.x-(pr.ult?0:pr.vx>0?15:-15),y,pr.ult?r*3:r*3,pr.vx>=0?1:-1))continue;
+    if(pr.owner==='p'&&energy(pr.ult?5:1,pr.ult?Math.floor(G.time*8)%3:Math.floor(G.time*10)%6,pr.x-(pr.ult?0:pr.vx>0?15:-15),y,pr.ult?r*3:r*5,pr.ult?r*3:r*3,pr.vx>=0?1:-1))continue;
     const g=ctx.createRadialGradient(pr.x,y,1,pr.x,y,r*1.8);g.addColorStop(0,'#fff');g.addColorStop(.35,pr.col);g.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=g;ctx.beginPath();ctx.arc(pr.x,y,r*1.8,0,TAU);ctx.fill();
     ctx.globalAlpha=.35;ctx.fillStyle=pr.col;ctx.beginPath();ctx.ellipse(pr.x-pr.vx*.04,y,r*2.4,r*.6,0,0,TAU);ctx.fill();ctx.globalAlpha=1;
