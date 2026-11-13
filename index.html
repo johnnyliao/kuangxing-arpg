@@ -106,11 +106,13 @@ muteBtn.addEventListener('click',()=>{muted=!muted;muteBtn.textContent=muted?'�
 /* ---------- 輸入 ---------- */
 const keys={},pressed={};
 const KEYMAP={KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',
-  KeyJ:'light',KeyK:'heavy',KeyL:'blast',KeyI:'charge',KeyU:'ult',ShiftLeft:'dash',ShiftRight:'dash',Space:'dash',Enter:'ok'};
+  KeyJ:'light',KeyK:'heavy',KeyL:'blast',KeyI:'charge',KeyU:'ult',ShiftLeft:'dash',ShiftRight:'dash',Space:'dash',Enter:'ok',
+  Digit1:'c1',Digit2:'c2',Digit3:'c3',Numpad1:'c1',Numpad2:'c2',Numpad3:'c3'};
 addEventListener('keydown',e=>{const k=KEYMAP[e.code];if(!k)return;e.preventDefault();if(!keys[k])pressed[k]=true;keys[k]=true;audio();});
 addEventListener('keyup',e=>{const k=KEYMAP[e.code];if(k)keys[k]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
-cv.addEventListener('pointerdown',()=>{pressed.ok=true;audio();cv.focus();});
+let clk=null;
+cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();clk={x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};pressed.ok=true;audio();cv.focus();});
 const touch=document.getElementById('touch');
 if(matchMedia('(pointer:coarse)').matches||'ontouchstart' in window){
   touch.hidden=false;
@@ -170,10 +172,28 @@ const THEME=[
   {sky0:'#000000',sky1:'#3a0800',g0:'#1c0703',g1:'#000000',line:'rgba(255,90,20,.3)'}
 ];
 const ENDING=['炎星族，滅了。','帝王，滅了。','神，也滅了。','……世界，終於安靜了。'];
+const UPG=[
+  {id:'fist',name:'狂暴之拳',rare:false,max:3,d:'輕攻擊傷害 +25%\n每層疊加'},
+  {id:'quake',name:'崩山',rare:false,max:3,d:'重攻擊傷害 +30%\n擊退 +20%'},
+  {id:'multi',name:'連環氣彈',rare:false,max:2,d:'每發氣彈額外\n射出上下各 1 發'},
+  {id:'sea',name:'氣海',rare:false,max:3,d:'氣回復 +60%　耗氣 -3\n集氣速度 +30%'},
+  {id:'leech',name:'吸血本能',rare:false,max:3,d:'造成傷害的 4%\n回復體力'},
+  {id:'iron',name:'鋼鐵之軀',rare:false,max:3,d:'體力上限 +25%\n獲得時回復增加量'},
+  {id:'fury',name:'怒火中燒',rare:false,max:3,d:'怒氣累積 +40%\n（打人與被打）'},
+  {id:'orb',name:'毀滅之球',rare:true,max:2,d:'大絕招傷害 +50%\n爆炸範圍 +100'},
+  {id:'ghost',name:'殘影',rare:false,max:2,d:'衝刺速度 +30%\n衝刺無敵 +0.15 秒'},
+  {id:'crit',name:'暴擊',rare:false,max:4,d:'暴擊率 +15%（上限 60%）\n暴擊傷害 ×2'},
+  {id:'thorns',name:'反擊氣場',rare:false,max:2,d:'受傷時對周圍 130 範圍\n造成 20 點傷害'},
+  {id:'undying',name:'不死之軀',rare:true,max:1,d:'每局一次，致死攻擊\n保留 1 點體力並無敵 2 秒'},
+  {id:'bloodlust',name:'嗜殺',rare:false,max:3,d:'每次擊殺回復\n體力上限的 3%'},
+  {id:'blood',name:'狂戰士血脈',rare:true,max:1,d:'暴走門檻 35% → 50%\n暴走攻擊 ×1.4 → ×1.6'}
+];
+const UPG_BY=Object.fromEntries(UPG.map(u=>[u.id,u]));
 
 /* ---------- 狀態 ---------- */
 const G={mode:'title',stage:0,time:0,shake:0,flashA:0,hitstop:0,slow:0,sub:null,banner:null,line:0,modeT:0,endT:0,endSaid:0,deco:null};
 let P=null,enemies=[],proj=[],haz=[],parts=[],texts=[],ghosts=[];
+let BEST=loadBest();
 
 function makeDeco(){
   const d={stars:[],mts:[],clouds:[],frags:[]};
@@ -186,14 +206,19 @@ function makeDeco(){
 G.deco=makeDeco();
 
 function newPlayer(){
-  const s=G.stage;
-  return{x:180,y:420,z:0,face:1,size:1.15,pal:HERO_PAL,maxhp:220+80*s,hp:220+80*s,ki:100,rage:s===0?40:60,atk:1+.65*s,
+  return{x:180,y:420,z:0,face:1,size:1.15,pal:HERO_PAL,maxhp:220,hp:220,ki:100,rage:40,atk:1,mods:{},undyUsed:false,
     state:'idle',t:0,atkd:null,combo:0,comboT:0,buffer:null,inv:0,flash:0,walk:0,vx:0,vy:0,berserk:false,saidCharge:false,fired:false,hurtSaid:0};
 }
-function heroAtk(){return P.atk*(P.berserk?1.4:1);}
+const m=id=>P.mods[id]||0;
+function calcMax(){return (220+80*G.stage)*(1+.25*m('iron'));}
+function heal(v){P.hp=Math.min(P.maxhp,P.hp+v);}
+function heroAtk(){return P.atk*(P.berserk?(m('blood')?1.6:1.4):1);}
 
 /* ---------- 流程 ---------- */
-function startGame(){G.stage=0;enterStory();}
+function startGame(){P=newPlayer();G.stage=0;G.run={kills:0,dmg:0,picks:[],t0:G.time};enterStory();}
+function loadBest(){try{const b=JSON.parse(localStorage.getItem('kx_best'));return b&&typeof b.stage==='number'&&typeof b.kills==='number'?b:null;}catch(e){return null;}}
+function saveBest(stage,kills){try{if(!BEST||stage>BEST.stage||(stage===BEST.stage&&kills>BEST.kills)){BEST={stage,kills};localStorage.setItem('kx_best',JSON.stringify(BEST));}}catch(e){}}
+function bestTxt(b){return (b.stage>=5?'完成遊戲':'第'+b.stage+'章')+'　擊殺 '+b.kills;}
 function enterStory(){G.mode='story';G.line=-1;G.deco=makeDeco();nextLine();}
 function nextLine(){
   const st=STAGES[G.stage];G.line++;
@@ -201,14 +226,19 @@ function nextLine(){
   const [who,text]=st.intro[G.line];say(text,who,true);
 }
 function startStage(){
-  P=newPlayer();enemies=[];proj=[];haz=[];parts=[];texts=[];ghosts=[];
-  G.wave=0;G.waveDelay=1;G.bossSpawned=false;G.bossDone=false;G.doneT=0;G.boss=null;G.mode='play';G.sub=null;
+  P.maxhp=calcMax();P.atk=1+.65*G.stage;P.hp=Math.min(P.maxhp,P.hp+P.maxhp*.5);
+  Object.assign(P,{x:180,y:420,face:1,state:'idle',t:0,atkd:null,combo:0,comboT:0,buffer:null,inv:0,flash:0,walk:0,vx:0,vy:0,ki:100});
+  const pool=[...new Set(STAGES[G.stage].waves.flat())];
+  G.waves=[0,1,2].map(w=>Array.from({length:2+w+(G.stage>=2?1:0)},()=>pool[Math.floor(Math.random()*pool.length)]));
+  enemies=[];proj=[];haz=[];parts=[];texts=[];ghosts=[];
+  G.wave=0;G.clr=false;G.waveDelay=1;G.bossSpawned=false;G.bossDone=false;G.doneT=0;G.boss=null;G.mode='play';G.sub=null;
   G.banner={text:STAGES[G.stage].name,small:STAGES[G.stage].sub,t:2.2};SFX.wave();
 }
 function spawnEnemy(kind,side){
-  const d=DEF[kind];
-  const e={kind,d,x:side<0?-50:W+50,y:rnd(TOP+25,BOT-10),z:0,face:side<0?1:-1,size:d.size,pal:d.pal,hp:d.hp,maxhp:d.hp,
-    state:'idle',t:0,cool:rnd(.6,1.6),flash:0,walk:0,vx:0,poise:0,hw:18*d.size,hd:28,mode:null,chaseT:0,slot:rnd(-14,14)};
+  const d=DEF[kind],el=!d.boss&&Math.random()<.15,k=el?2.5:1,sz=d.size*(el?1.15:1);
+  const e={kind,d,x:side<0?-50:W+50,y:rnd(TOP+25,BOT-10),z:0,face:side<0?1:-1,size:sz,pal:d.pal,hp:d.hp*k,maxhp:d.hp*k,dmg:d.dmg*(el?1.3:1),elite:el,
+    state:'idle',t:0,cool:rnd(.6,1.6),flash:0,walk:0,vx:0,poise:0,hw:18*sz,hd:28,mode:null,chaseT:0,slot:rnd(-14,14)};
+  if(el){e.aura='#ffcf5a';e.auraK=.8;}
   enemies.push(e);return e;
 }
 function spawnWave(list){list.forEach((k,i)=>spawnEnemy(k,i%2?1:-1));SFX.wave();}
@@ -222,6 +252,35 @@ function spawnBoss(){
     G.boss=spawnEnemy(st.boss,1);G.boss.x=W+60;G.boss.y=410;G.boss.cool=1.2;
     G.banner={text:SPEAK[st.boss].name,small:'',t:2};say(st.bossIn,st.boss,true);
   }
+}
+
+function openDraft(next){
+  G.draftNext=next;G.dsel=0;G.modeT=0;
+  const pool=UPG.filter(u=>m(u.id)<u.max);G.cards=[];
+  while(G.cards.length<3&&pool.length){
+    let r=Math.random()*pool.reduce((s,u)=>s+(u.rare?3:10),0),i=0;
+    while(i<pool.length-1&&(r-=pool[i].rare?3:10)>=0)i++;
+    G.cards.push(pool.splice(i,1)[0].id);
+  }
+  if(G.cards.length)G.mode='draft';else afterDraft();
+}
+function afterDraft(){if(G.draftNext==='story'){G.stage++;enterStory();}else G.mode='play';}
+function cardAt(x,y){for(let i=0;i<G.cards.length;i++)if(x>=90+i*270&&x<=330+i*270&&y>=170&&y<=430)return i;return -1;}
+function draftStep(){
+  const n=G.cards.length;let pick=-1;
+  if(clk)pick=cardAt(clk.x,clk.y);
+  else{
+    if(pressed.c1)pick=0;else if(pressed.c2)pick=1;else if(pressed.c3)pick=2;
+    if(pressed.left)G.dsel=(G.dsel+n-1)%n;
+    if(pressed.right)G.dsel=(G.dsel+1)%n;
+    if(pick<0&&(pressed.ok||pressed.light))pick=G.dsel;
+  }
+  if(pick>=0&&pick<n){G.dsel=pick;pickUpgrade(pick);}
+}
+function pickUpgrade(i){
+  const id=G.cards[i],old=P.maxhp;
+  P.mods[id]=m(id)+1;P.maxhp=calcMax();P.hp=Math.min(P.maxhp,P.hp+P.maxhp-old);
+  G.run.picks.push(UPG_BY[id].name);SFX.wave();afterDraft();
 }
 
 /* ---------- 玩家 ---------- */
@@ -239,19 +298,21 @@ function startAttack(type){
 }
 function doMelee(a){
   let hit=false;
+  const dm=a.dmg*(a.heavy?1+.3*m('quake'):a.type==='light'?1+.25*m('fist'):1),kb=a.kb*(a.heavy?1+.2*m('quake'):1)*P.face;
   for(const e of enemies){
     if(e.dying!==undefined)continue;
     const dx=(e.x-P.x)*P.face,dy=Math.abs(e.y-P.y);
-    if(dx>-e.hw&&dx<a.range+e.hw*.6&&dy<e.hd){hitEnemy(e,a.dmg,a.kb*P.face,a.stun,a.big);hit=true;}
+    if(dx>-e.hw&&dx<a.range+e.hw*.6&&dy<e.hd){hitEnemy(e,dm,kb,a.stun,a.big);hit=true;}
   }
   if(hit){(a.heavy?SFX.heavy:SFX.light)();G.hitstop=a.heavy?.08:.035;if(a.big)G.shake=Math.max(G.shake,a.heavy?8:4);}
   else tone(260,120,.08,'triangle',.05);
 }
 function hitEnemy(e,base,kbx,stun,big){
   if(e.dying!==undefined)return;
-  const dmg=base*heroAtk();
-  e.hp-=dmg;e.flash=.1;P.rage=Math.min(100,P.rage+base*.55);
-  texts.push({x:e.x+rnd(-10,10),y:e.y-(e.static?230:110*e.size),v:Math.round(dmg),t:.8,big});
+  const cr=Math.random()<Math.min(.6,.15*m('crit')),dmg=base*heroAtk()*(cr?2:1);
+  e.hp-=dmg;e.flash=.1;P.rage=Math.min(100,P.rage+base*.55*(1+.4*m('fury')));G.run.dmg+=dmg;
+  if(m('leech'))heal(dmg*.04*m('leech'));
+  texts.push({x:e.x+rnd(-10,10),y:e.y-(e.static?230:110*e.size),v:Math.round(dmg),t:.8,big,cr});
   for(let i=0;i<(big?14:7);i++)parts.push({x:e.x,y:e.y-(e.static?120:60*e.size),vx:rnd(-260,260),vy:rnd(-300,60),life:rnd(.2,.45),col:big?'#ffd27a':'#fff2c0',sz:rnd(2,4)});
   if(e.d.boss){
     e.poise+=base;
@@ -261,6 +322,9 @@ function hitEnemy(e,base,kbx,stun,big){
 }
 function killEnemy(e,kbx){
   e.hp=0;e.dying=.7;e.vx=kbx*1.4;e.state='die';
+  G.run.kills++;
+  if(m('bloodlust'))heal(P.maxhp*.03*m('bloodlust'));
+  if(e.elite)heal(P.maxhp*.08);
   if(e===G.boss){
     G.bossDone=true;G.slow=1.2;G.shake=18;G.flashA=.6;SFX.boom();
     const st=STAGES[G.stage];if(st.bossOut)say(st.bossOut,st.boss,true);
@@ -270,24 +334,29 @@ function killEnemy(e,kbx){
 }
 function hurtPlayer(dmg,kb){
   if(P.inv>0||P.state==='ult'||P.state==='dash'||G.mode!=='play'||G.bossDone)return;
-  P.hp-=dmg;P.inv=.6;P.flash=.12;P.state='hurt';P.t=.3;P.vx=kb;P.rage=Math.min(100,P.rage+dmg*.9);
+  P.hp-=dmg;P.inv=.6;P.flash=.12;P.state='hurt';P.t=.3;P.vx=kb;P.rage=Math.min(100,P.rage+dmg*.9*(1+.4*m('fury')));
   G.shake=Math.max(G.shake,7);SFX.hurt();
   for(let i=0;i<8;i++)parts.push({x:P.x,y:P.y-70,vx:rnd(-200,200),vy:rnd(-250,50),life:.35,col:'#ff4a3a',sz:3});
-  if(P.hp<=0){P.hp=0;G.mode='dead';G.modeT=0;say('不……可能……','hero',true);return;}
-  if(!P.berserk&&P.hp<P.maxhp*.35){P.berserk=true;G.flashA=.5;G.shake=12;say('我……已經……停不下來了！','hero',true);}
+  if(P.hp<=0&&m('undying')&&!P.undyUsed){P.undyUsed=true;P.hp=1;P.inv=2;G.flashA=.5;G.banner={text:'不死之軀',small:'',t:1.6};}
+  if(P.hp<=0){P.hp=0;G.mode='dead';G.modeT=0;saveBest(G.stage+1,G.run.kills);say('不……可能……','hero',true);return;}
+  if(!P.berserk&&P.hp<P.maxhp*(m('blood')?.5:.35)){P.berserk=true;G.flashA=.5;G.shake=12;say('我……已經……停不下來了！','hero',true);}
   else if(G.time-P.hurtSaid>6&&Math.random()<.35){P.hurtSaid=G.time;say(Math.random()<.5?'就這點程度？':'給我滾開！','hero');}
+  if(m('thorns')){const r=130,dm=20*m('thorns');
+    for(const e of enemies)if(e.dying===undefined&&Math.hypot((e.x-P.x)/r,(e.y-P.y)/(r*.45))<1)hitEnemy(e,dm,(e.x>=P.x?1:-1)*140,.3,false);
+    for(let i=0;i<24;i++){const a=i/24*TAU;parts.push({x:P.x,y:P.y-70,vx:Math.cos(a)*300,vy:Math.sin(a)*135,life:.35,col:'#ffcf5a',sz:3});}
+  }
 }
 function clampP(){P.x=clamp(P.x,30,W-30);P.y=clamp(P.y,TOP+15,BOT);}
 function updatePlayer(dt){
   const p=P;
   p.inv=Math.max(0,p.inv-dt);p.flash-=dt;p.comboT-=dt;
-  p.ki=Math.min(100,p.ki+7*dt);
+  p.ki=Math.min(100,p.ki+7*dt*(1+.6*m('sea')));
   if(p.berserk)p.rage=Math.min(100,p.rage+3*dt);
   if(p.state==='hurt'){p.t-=dt;p.x+=p.vx*dt;p.vx*=Math.pow(.01,dt);clampP();if(p.t<=0)p.state='idle';return;}
   if(p.state==='ult'){
     p.t+=dt;
     if(p.t<.9){G.shake=Math.max(G.shake,3);if(Math.random()<.6)parts.push({x:p.x+rnd(-140,140),y:p.y-rnd(0,200),tx:p.x+p.face*12,ty:p.y-175,life:.4,col:'#ffcf5a',sz:3,suck:true});}
-    if(p.t>=.9&&!p.fired){p.fired=true;proj.push({owner:'p',ult:true,x:p.x+p.face*30,y:p.y,z:110,vx:p.face*330,vy:0,r:58,dmg:85,life:1.5,hit:new Set(),col:'#ffcf5a'});SFX.blast();G.shake=10;}
+    if(p.t>=.9&&!p.fired){p.fired=true;proj.push({owner:'p',ult:true,x:p.x+p.face*30,y:p.y,z:110,vx:p.face*330,vy:0,r:58,dmg:85*(1+.5*m('orb')),life:1.5,hit:new Set(),col:'#ffcf5a'});SFX.blast();G.shake=10;}
     if(p.t>=1.3)p.state='idle';
     return;
   }
@@ -309,21 +378,23 @@ function updatePlayer(dt){
   if(keys.charge){
     if(p.state!=='charge'){p.state='charge';p.chT=0;if(!p.saidCharge||Math.random()<.5){say('啊啊啊啊——！','hero');p.saidCharge=true;}}
     p.chT-=dt;if(p.chT<=0){p.chT=.5;SFX.charge();}
-    p.ki=Math.min(100,p.ki+50*dt);p.rage=Math.min(100,p.rage+7*dt);G.shake=Math.max(G.shake,1.5);
+    p.ki=Math.min(100,p.ki+50*dt*(1+.3*m('sea')));p.rage=Math.min(100,p.rage+7*dt);G.shake=Math.max(G.shake,1.5);
     if(Math.random()<.5)parts.push({x:p.x+rnd(-30,30),y:p.y-rnd(0,20),vx:rnd(-20,20),vy:rnd(-260,-120),life:.5,col:p.berserk?'#ffcf5a':'#ff5a3c',sz:rnd(2,4)});
     return;
   }else if(p.state==='charge')p.state='idle';
   if(pressed.light){startAttack('light');return;}
   if(pressed.heavy){startAttack('heavy');return;}
   if(pressed.blast){
-    if(p.ki>=12){p.ki-=12;p.state='blast';p.t=.2;SFX.blast();proj.push({owner:'p',x:p.x+p.face*40,y:p.y,z:78,vx:p.face*680,vy:0,r:13,dmg:11,life:1.3,col:'#ff6a3a'});}
+    const cost=Math.max(4,12-3*m('sea'));
+    if(p.ki>=cost){p.ki-=cost;p.state='blast';p.t=.2;SFX.blast();proj.push({owner:'p',x:p.x+p.face*40,y:p.y,z:78,vx:p.face*680,vy:0,r:13,dmg:11,life:1.3,col:'#ff6a3a'});
+      for(let k=1;k<=m('multi');k++)for(const s of[-1,1])proj.push({owner:'p',x:p.x+p.face*40,y:p.y,z:78,vx:p.face*680,vy:s*120*k,r:13,dmg:11,life:1.3,col:'#ff6a3a'});}
     else G.banner={text:'氣不夠',small:'按住 I 集氣',t:.9};
     return;
   }
   let mx=(keys.right?1:0)-(keys.left?1:0),my=(keys.down?1:0)-(keys.up?1:0);
   if(pressed.dash){
     let dx=mx,dy=my;if(!dx&&!dy)dx=p.face;const l=Math.hypot(dx,dy);
-    p.state='dash';p.t=.18;p.vx=dx/l*640;p.vy=dy/l*380;p.inv=.24;SFX.dash();return;
+    const sp=1+.3*m('ghost');p.state='dash';p.t=.18;p.vx=dx/l*640*sp;p.vy=dy/l*380*sp;p.inv=.24+.15*m('ghost');SFX.dash();return;
   }
   if(mx||my){const l=Math.hypot(mx,my);p.x+=mx/l*240*dt;p.y+=my/l*170*dt;if(mx)p.face=mx;p.walk+=dt*12;p.state='walk';}
   else p.state='idle';
@@ -342,14 +413,14 @@ function updateEnemy(e,dt){
     const a=e.atk;e.t+=dt;
     if(a.type==='dash'){
       if(e.t>=a.hitAt&&e.t<a.dur-.12){e.x+=a.dir*720*dt;e.x=clamp(e.x,20,W-20);
-        if(!a.done&&Math.abs(P.x-e.x)<40&&Math.abs(P.y-e.y)<30){a.done=true;hurtPlayer(d.dmg*1.2,a.dir*380);}
+        if(!a.done&&Math.abs(P.x-e.x)<40&&Math.abs(P.y-e.y)<30){a.done=true;hurtPlayer(e.dmg*1.2,a.dir*380);}
         if(Math.random()<.6)ghosts.push({x:e.x,y:e.y,face:e.face,t:.18,pal:e.pal,size:e.size});}
     }else if(!a.done&&e.t>=a.hitAt){
       a.done=true;
-      if(a.type==='melee'){const ddx=(P.x-e.x)*e.face;if(ddx>-12&&ddx<a.range&&Math.abs(P.y-e.y)<28)hurtPlayer(d.dmg,e.face*300);SFX.light();}
-      else if(a.type==='shot'){proj.push({owner:'e',x:e.x+e.face*34,y:e.y,z:75*e.size,vx:e.face*390,vy:0,r:11,dmg:d.dmg,life:3,col:d.shot});SFX.eshot();}
-      else if(a.type==='spread'){for(let i=-2;i<=2;i++)proj.push({owner:'e',x:e.x+e.face*40,y:e.y,z:80*e.size,vx:e.face*400,vy:i*75,r:13,dmg:d.dmg*.8,life:3,col:d.shot});SFX.eshot();}
-      else if(a.type==='rain'){for(let i=0;i<6;i++)haz.push({x:clamp(P.x+rnd(-170,170),30,W-30),y:clamp(P.y+rnd(-55,55),TOP+15,BOT),t:.9+i*.08,max:.9+i*.08,r:46,dmg:d.dmg*.9,col:d.shot});}
+      if(a.type==='melee'){const ddx=(P.x-e.x)*e.face;if(ddx>-12&&ddx<a.range&&Math.abs(P.y-e.y)<28)hurtPlayer(e.dmg,e.face*300);SFX.light();}
+      else if(a.type==='shot'){proj.push({owner:'e',x:e.x+e.face*34,y:e.y,z:75*e.size,vx:e.face*390,vy:0,r:11,dmg:e.dmg,life:3,col:d.shot});SFX.eshot();}
+      else if(a.type==='spread'){for(let i=-2;i<=2;i++)proj.push({owner:'e',x:e.x+e.face*40,y:e.y,z:80*e.size,vx:e.face*400,vy:i*75,r:13,dmg:e.dmg*.8,life:3,col:d.shot});SFX.eshot();}
+      else if(a.type==='rain'){for(let i=0;i<6;i++)haz.push({x:clamp(P.x+rnd(-170,170),30,W-30),y:clamp(P.y+rnd(-55,55),TOP+15,BOT),t:.9+i*.08,max:.9+i*.08,r:46,dmg:e.dmg*.9,col:d.shot});}
     }
     if(e.t>=a.dur){e.state='idle';e.cool=(a.cool||1)*hurry;}
     return;
@@ -399,7 +470,7 @@ function separate(){
 /* ---------- 飛行物與地面危險區 ---------- */
 function ultExplode(pr){
   G.flashA=1;G.shake=26;SFX.boom();
-  for(const e of enemies)if(e.dying===undefined&&Math.abs(e.x-pr.x)<460)hitEnemy(e,60,(e.x>=pr.x?1:-1)*500,1,true);
+  for(const e of enemies)if(e.dying===undefined&&Math.abs(e.x-pr.x)<460+100*m('orb'))hitEnemy(e,60*(1+.5*m('orb')),(e.x>=pr.x?1:-1)*500,1,true);
   for(let i=0;i<70;i++){const a=rnd(0,TAU),s=rnd(100,700);parts.push({x:pr.x,y:pr.y-pr.z,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rnd(.4,1),col:i%2?'#ffcf5a':'#ff3a1a',sz:rnd(3,7)});}
 }
 function updateProj(dt){
@@ -448,17 +519,17 @@ function playStep(dt){
   if(G.bossDone){
     G.doneT+=dt;
     if(G.doneT>2.6){
-      if(G.stage===STAGES.length-1){G.mode='ending';G.endT=0;G.endSaid=0;if(window.speechSynthesis)speechSynthesis.cancel();}
+      if(G.stage===STAGES.length-1){G.mode='ending';G.endT=0;G.endSaid=0;saveBest(5,G.run.kills);if(window.speechSynthesis)speechSynthesis.cancel();}
       else{G.mode='clear';G.modeT=0;say('還不夠……還不夠！','hero',true);SFX.wave();}
     }
     return;
   }
   const alive=enemies.filter(e=>e.dying===undefined).length;
   if(alive===0&&!G.bossSpawned){
+    if(G.wave>0&&!G.clr){G.clr=true;G.waveDelay=1.2;openDraft('play');return;}
     G.waveDelay-=dt;
     if(G.waveDelay<=0){
-      const st=STAGES[G.stage];
-      if(G.wave<st.waves.length){spawnWave(st.waves[G.wave]);G.wave++;G.banner={text:'第 '+G.wave+' 波',small:'',t:1.2};}
+      if(G.wave<G.waves.length){spawnWave(G.waves[G.wave]);G.wave++;G.clr=false;G.banner={text:'第 '+G.wave+' 波',small:'',t:1.2};}
       else spawnBoss();
       G.waveDelay=1.2;
     }
@@ -473,8 +544,9 @@ function step(dt){
     case'title':if(go)startGame();break;
     case'story':if(go)nextLine();break;
     case'play':playStep(dt);break;
-    case'clear':G.modeT+=dt;if(G.modeT>1&&go){G.stage++;enterStory();}break;
-    case'dead':G.modeT+=dt;updateFx(dt);if(G.modeT>1.2&&go)startStage();break;
+    case'draft':draftStep();break;
+    case'clear':G.modeT+=dt;if(G.modeT>1&&go)openDraft('story');break;
+    case'dead':G.modeT+=dt;updateFx(dt);if(G.modeT>1.2&&go){G.mode='title';G.deco=makeDeco();}break;
     case'ending':G.endT+=dt;
       for(let i=G.endSaid;i<ENDING.length;i++){if(G.endT>4.5+i*2.8){say(ENDING[i],'hero',true);G.endSaid=i+1;}}
       if(G.endT>16&&go){G.mode='title';G.deco=makeDeco();}break;
@@ -598,6 +670,10 @@ function drawHUD(){
   const full=P.rage>=100,pulse=.6+.4*Math.sin(G.time*10);
   txt('怒',20,82,11,'#ffcf5a');bar(38,74,200,8,P.rage/100,full?`rgba(255,207,90,${pulse})`:'#a8742a');
   if(full)txt('按 U 大絕招',246,82,12,`rgba(255,207,90,${pulse})`);
+  let cx=20,cy=100;ctx.font=`900 12px ${FU}`;ctx.textAlign='left';
+  for(const id in P.mods){const n=P.mods[id];if(!n)continue;const u=UPG_BY[id],s=u.name+'×'+n,w=ctx.measureText(s).width+12;
+    if(cx>20&&cx+w>320){cx=20;cy+=18;}
+    ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(cx,cy-12,w,16);ctx.fillStyle=u.rare?'#ffcf5a':'#f1e6d8';ctx.fillText(s,cx+6,cy);cx+=w+5;}
   const st=STAGES[G.stage];txt(st.name,W-20,26,16,'#f1e6d8','right',FD);txt(st.sub,W-20,44,12,'#8f8296','right');
   if(G.boss&&G.boss.dying===undefined&&!G.bossDone){
     const b=G.boss,name=b.kind==='core'?'星核':SPEAK[b.kind].name;
@@ -622,7 +698,7 @@ function drawPlay(){
   }
   for(const g of ghosts){ctx.save();ctx.globalAlpha=g.t*2;drawFighter({x:g.x,y:g.y,z:0,face:g.face,size:g.size||P.size,pal:g.pal||{...HERO_PAL,skin:'#ff5a3c',body:'#ff5a3c',pants:'#ff5a3c',hair:'#ff5a3c',accent:'#ff5a3c'},pose:'dash',d:null},1,.35);ctx.restore();}
   const list=[P,...enemies].sort((a,b)=>a.y-b.y);
-  for(const e of list){if(e.kind==='core')drawCore(e);else drawFighter(e);
+  for(const e of list){if(e.kind==='core')drawCore(e);else drawFighter(e);if(e.elite&&e.dying===undefined)strokeTxt('菁英',e.x,e.y-150*e.size,14,'#ffcf5a','center',FU);
     if(e!==P&&e.state==='atk'&&e.t<(e.atk.hitAt||0)&&e.dying===undefined){ctx.fillStyle=`rgba(255,60,40,${.5+.5*Math.sin(G.time*40)})`;ctx.beginPath();ctx.arc(e.x+e.face*20*e.size,e.y-130*e.size,4,0,TAU);ctx.fill();}}
   if(P.state==='ult'){const r=Math.min(58,P.t/.9*58);if(!P.fired){ctx.save();ctx.globalCompositeOperation='lighter';const sx=P.x+P.face*12,sy=P.y-175;
     const g=ctx.createRadialGradient(sx,sy,1,sx,sy,r*1.4);g.addColorStop(0,'#fff');g.addColorStop(.4,'#ffcf5a');g.addColorStop(1,'rgba(255,58,26,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(sx,sy,r*1.4,0,TAU);ctx.fill();ctx.restore();}}
@@ -633,7 +709,7 @@ function drawPlay(){
     ctx.globalAlpha=.35;ctx.fillStyle=pr.col;ctx.beginPath();ctx.ellipse(pr.x-pr.vx*.04,y,r*2.4,r*.6,0,0,TAU);ctx.fill();ctx.globalAlpha=1;}
   for(const p of parts){ctx.globalAlpha=clamp(p.life*3,0,1);ctx.fillStyle=p.col;ctx.fillRect(p.x,p.y,p.sz,p.sz);}
   ctx.restore();ctx.globalAlpha=1;
-  for(const t of texts)strokeTxt(t.v,t.x,t.y,t.big?26:18,t.big?'#ffcf5a':'#fff','center',FU);
+  for(const t of texts)strokeTxt(t.cr?t.v+'!':t.v,t.x,t.y,t.cr?32:t.big?26:18,t.cr?'#ff7a3a':t.big?'#ffcf5a':'#fff','center',FU);
 }
 function drawTitle(){
   drawBG(3,G.time);ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,0,W,H);
@@ -643,6 +719,7 @@ function drawTitle(){
   strokeTxt('狂星破滅',640,210,92,'#f1e6d8','center',FD);
   strokeTxt('被族人放逐的狂戰士，殺穿同族、帝王與神，直到世界的盡頭。',640,256,16,'#ffb347','center',FU);
   const a=.5+.5*Math.sin(G.time*4);ctx.globalAlpha=a;strokeTxt('按 Enter 或點擊畫面開始',640,330,20,'#f1e6d8','center',FU);ctx.globalAlpha=1;
+  if(BEST)strokeTxt('最佳紀錄：'+bestTxt(BEST),640,376,20,'#ffcf5a','center',FU);
   txt('需要聲音：請開啟喇叭，語音使用瀏覽器內建的中文朗讀',640,500,12,'#8f8296','center',FU,500);
 }
 function drawStory(){
@@ -664,14 +741,32 @@ function drawClear(){
   strokeTxt(STAGES[G.stage].name+'　完',W/2,200,48,'#f1e6d8');
   const nx=G.stage+1;
   strokeTxt('力量覺醒',W/2,260,22,'#ffb347','center',FU);
-  txt('體力上限　'+(220+80*G.stage)+' → '+(220+80*nx),W/2,300,18,'#f1e6d8','center',FU,500);
+  txt('體力上限　'+Math.round(P.maxhp)+' → '+Math.round((220+80*nx)*(1+.25*m('iron'))),W/2,300,18,'#f1e6d8','center',FU,500);
   txt('攻擊倍率　×'+(1+.65*G.stage).toFixed(2)+' → ×'+(1+.65*nx).toFixed(2),W/2,328,18,'#f1e6d8','center',FU,500);
   if(G.modeT>1)txt('按 Enter 繼續',W/2,400,16,'#8f8296','center',FU,500);
 }
 function drawDead(){
   drawPlay();ctx.fillStyle='rgba(30,0,0,.6)';ctx.fillRect(0,0,W,H);
-  strokeTxt('倒下了',W/2,230,60,'#d8322a');
-  if(G.modeT>1.2)strokeTxt('按 Enter 重來這一章',W/2,290,18,'#f1e6d8','center',FU);
+  strokeTxt('本局結束',W/2,110,56,'#d8322a');
+  const r=G.run,pk=r.picks;
+  txt('到達　第 '+(G.stage+1)+' 章',W/2,170,22,'#f1e6d8','center',FU,500);
+  txt('擊殺　'+r.kills+'　　總傷害　'+Math.round(r.dmg),W/2,206,20,'#f1e6d8','center',FU,500);
+  if(!pk.length)txt('沒有選擇任何強化',W/2,250,16,'#8f8296','center',FU,500);
+  for(let i=0;i<pk.length;i+=6)txt(pk.slice(i,i+6).join('、'),W/2,250+i/6*26,16,'#ffcf5a','center',FU,500);
+  if(BEST)txt('最佳紀錄：'+bestTxt(BEST),W/2,340,20,'#ffb347','center',FU,500);
+  if(G.modeT>1.2)strokeTxt('按 Enter 回到標題',W/2,420,18,'#f1e6d8','center',FU);
+}
+function drawDraft(){
+  drawPlay();ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(0,0,W,H);
+  strokeTxt('選擇一項強化',W/2,120,36,'#f1e6d8');
+  G.cards.forEach((id,i)=>{const u=UPG_BY[id],x=90+i*270,y=170,sel=i===G.dsel;
+    ctx.fillStyle=sel?'#2a1a26':'#120a12';ctx.fillRect(x,y,240,260);
+    ctx.strokeStyle=u.rare?'#ffcf5a':'#c9b8a8';ctx.lineWidth=sel?5:2;ctx.strokeRect(x,y,240,260);
+    strokeTxt(u.name,x+120,y+62,26,u.rare?'#ffcf5a':'#f1e6d8');
+    u.d.split('\n').forEach((l,j)=>txt(l,x+120,y+120+j*28,16,'#f1e6d8','center',FU,500));
+    if(m(id))txt('已有 x'+m(id),x+120,y+236,14,'#ffb347','center',FU,500);
+  });
+  txt('1 / 2 / 3 或 A D 選擇，Enter 確認，也可以點擊',W/2,480,14,'#8f8296','center',FU,500);
 }
 function drawEnding(){
   const t=G.endT;
@@ -698,14 +793,16 @@ function render(){
     case'story':drawStory();break;
     case'play':drawPlay();drawHUD();drawBanner();drawSub();break;
     case'clear':drawClear();break;
+    case'draft':drawDraft();break;
     case'dead':drawDead();break;
     case'ending':drawEnding();drawSub();break;
   }
   if(G.flashA>0){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=`rgba(255,250,235,${G.flashA})`;ctx.fillRect(0,0,W,H);}
 }
 let last=performance.now();
-function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;G.time+=dt;step(dt);render();for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;G.time+=dt;step(dt);render();clk=null;for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
+if(location.hash==='#debug')window.__kx={G,get P(){return P;},enemies:()=>enemies,killAll(){enemies.filter(e=>e.dying===undefined&&!e.static).forEach(e=>killEnemy(e,0));}};
 cv.focus();
 })();
 </script>
