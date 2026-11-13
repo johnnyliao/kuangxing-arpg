@@ -1,4 +1,5 @@
 <title>辦公室格鬥傳</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,11 +22,41 @@ canvas{width:100%;height:100%;display:block;border:1px solid var(--line);backgro
 #mute{font:inherit;color:var(--ink);background:#160f19;border:1px solid var(--line);border-radius:4px;padding:4px 10px;cursor:pointer}
 #mute:focus-visible{outline:2px solid var(--ember)}
 #touch{position:absolute;inset:0;pointer-events:none}
-#stick{position:absolute;left:3%;bottom:6%;width:22%;aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.18);background:rgba(0,0,0,.25);pointer-events:auto;touch-action:none}
-#knob{position:absolute;left:35%;top:35%;width:30%;height:30%;border-radius:50%;background:rgba(255,120,80,.45)}
-#btns{position:absolute;right:2%;bottom:5%;display:grid;grid-template-columns:repeat(3,auto);gap:8px;pointer-events:auto}
-#btns button{width:clamp(44px,7vw,64px);aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.25);background:rgba(20,10,20,.55);color:var(--ink);font:900 16px var(--ui);touch-action:none}
-#btns button[data-k="ult"]{border-color:var(--ember);color:var(--ember)}
+#rot{display:none}
+/* 手機版：全螢幕橫向，左下搖桿、右下主攻擊鍵＋弧形技能鍵（MOBA 式） */
+body.mobile{padding:0;height:100dvh;overflow:hidden;justify-content:center;background:#000;gap:0}
+body.mobile #wrap{max-width:none;width:min(100vw,100dvh*16/9);position:static}
+body.mobile canvas{border:0}
+body.mobile .bar{position:fixed;top:max(6px,env(safe-area-inset-top,0px));right:max(10px,env(safe-area-inset-right,0px));width:auto;z-index:3}
+body.mobile #mute{padding:3px 8px;font-size:12px;opacity:.75}
+body.mobile #touch{position:fixed;inset:0;z-index:2}
+body.mobile #touch.off #stick,body.mobile #touch.off #btns{display:none}
+#stick{position:absolute;left:calc(max(16px,env(safe-area-inset-left,0px)) + 3vh);bottom:6vh;width:34vh;aspect-ratio:1;border-radius:50%;
+  border:2px solid rgba(140,200,255,.35);background:radial-gradient(circle,rgba(40,70,110,.35),rgba(10,20,40,.25) 70%);pointer-events:auto;touch-action:none;
+  box-shadow:0 0 18px rgba(90,170,255,.25) inset}
+#knob{position:absolute;left:30%;top:30%;width:40%;height:40%;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#cfe6ff,#4a8fd8 60%,#23497a);box-shadow:0 0 14px rgba(120,190,255,.6);border:2px solid rgba(255,255,255,.6)}
+#btns{position:absolute;right:calc(max(16px,env(safe-area-inset-right,0px)) + 1vh);bottom:3vh;width:53vh;height:38vh;pointer-events:auto}
+#btns button{position:absolute;--p:1;--c:rgba(255,215,160,.55);width:11vh;height:11vh;border-radius:50%;padding:0;border:0;color:#fff;touch-action:none;
+  background:radial-gradient(circle at 45% 35%,rgba(70,60,90,.85),rgba(15,10,25,.85) 70%);
+  box-shadow:0 0 0 2px rgba(255,255,255,.28),0 4px 10px rgba(0,0,0,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font:900 4.4vh/1 var(--ui);user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#btns button::before{content:"";position:absolute;inset:-4px;border-radius:50%;z-index:-1;
+  background:conic-gradient(var(--c) calc(var(--p)*360deg),rgba(255,255,255,.12) 0)}
+#btns button small{font:700 1.9vh/1 var(--ui);margin-top:.5vh;opacity:.85;text-shadow:0 1px 2px #000}
+#btns button.down{transform:scale(.9);filter:brightness(1.4)}
+#btns button.dim{filter:grayscale(.8) brightness(.6)}
+#btns [data-k="light"]{right:1vh;bottom:1vh;width:20vh;height:20vh;font-size:7vh;
+  background:radial-gradient(circle at 45% 35%,#ff9a6a,#c0392b 60%,#5a1210)}
+#btns [data-k="heavy"]{right:25vh;bottom:5.5vh}
+#btns [data-k="blast"]{right:19vh;bottom:19vh;--c:#ff6a3a}
+#btns [data-k="ult"]{right:5vh;bottom:24vh;width:13vh;height:13vh;--c:#ffcf5a}
+#btns [data-k="ult"].ready{animation:glow .6s ease-in-out infinite alternate}
+@keyframes glow{to{box-shadow:0 0 0 3px #ffcf5a,0 0 22px #ffb347}}
+#btns [data-k="dash"]{right:41vh;bottom:4vh;width:10vh;height:10vh;font-size:4vh}
+#btns [data-k="charge"]{right:38vh;bottom:20vh;width:10vh;height:10vh;font-size:4vh}
+@media (orientation:portrait){body.mobile #rot{display:flex;position:fixed;inset:0;z-index:9;background:#0b0710;color:var(--ink);
+  align-items:center;justify-content:center;text-align:center;font:900 22px/1.6 var(--ui);padding:24px}}
 @media (pointer:coarse){.bar .keys{display:none}}
 </style>
 
@@ -34,11 +65,13 @@ canvas{width:100%;height:100%;display:block;border:1px solid var(--line);backgro
   <div id="touch" hidden>
     <div id="stick"><div id="knob"></div></div>
     <div id="btns">
-      <button data-k="charge">集</button><button data-k="blast">氣</button><button data-k="ult">絕</button>
-      <button data-k="dash">閃</button><button data-k="light">輕</button><button data-k="heavy">重</button>
+      <button data-k="light">拳<small>攻擊</small></button><button data-k="heavy">重<small>重擊</small></button>
+      <button data-k="blast">氣<small>氣彈</small></button><button data-k="ult">絕<small>大絕</small></button>
+      <button data-k="dash">閃<small>衝刺</small></button><button data-k="charge">集<small>集氣</small></button>
     </div>
   </div>
 </div>
+<div id="rot">請將手機橫放<br>以獲得最佳體驗</div>
 <div class="bar">
   <span class="keys"><kbd>WASD</kbd>移動</span>
   <span class="keys"><kbd>J</kbd>輕攻擊（三連）</span>
@@ -116,18 +149,21 @@ let clk=null;
 cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();clk={x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};pressed.ok=true;audio();cv.focus();});
 const touch=document.getElementById('touch');
 if(matchMedia('(pointer:coarse)').matches||'ontouchstart' in window){
-  touch.hidden=false;
+  touch.hidden=false;document.body.classList.add('mobile');
+  const fs=()=>{const d=document.documentElement;if(!document.fullscreenElement&&d.requestFullscreen)
+    d.requestFullscreen().then(()=>screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape')).catch(()=>{});};
+  addEventListener('pointerdown',fs,{once:true});
   const stick=document.getElementById('stick'),knob=document.getElementById('knob');
   const setStick=e=>{const r=stick.getBoundingClientRect(),dx=(e.clientX-r.left-r.width/2)/(r.width/2),dy=(e.clientY-r.top-r.height/2)/(r.height/2);
     keys.left=dx<-.3;keys.right=dx>.3;keys.up=dy<-.3;keys.down=dy>.3;
-    knob.style.left=(35+clamp(dx,-1,1)*30)+'%';knob.style.top=(35+clamp(dy,-1,1)*30)+'%';};
-  const endStick=()=>{keys.left=keys.right=keys.up=keys.down=false;knob.style.left=knob.style.top='35%';};
+    knob.style.left=(30+clamp(dx,-1,1)*30)+'%';knob.style.top=(30+clamp(dy,-1,1)*30)+'%';};
+  const endStick=()=>{keys.left=keys.right=keys.up=keys.down=false;knob.style.left=knob.style.top='30%';};
   stick.addEventListener('pointerdown',e=>{stick.setPointerCapture(e.pointerId);setStick(e);audio();});
   stick.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType==='touch')setStick(e);});
   stick.addEventListener('pointerup',endStick);stick.addEventListener('pointercancel',endStick);
   document.querySelectorAll('#btns button').forEach(b=>{const k=b.dataset.k;
-    b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;pressed[k]=true;pressed.ok=true;audio();});
-    const up=()=>{keys[k]=false;};b.addEventListener('pointerup',up);b.addEventListener('pointerleave',up);b.addEventListener('pointercancel',up);});
+    b.addEventListener('pointerdown',e=>{e.preventDefault();b.classList.add('down');keys[k]=true;pressed[k]=true;pressed.ok=true;audio();});
+    const up=()=>{keys[k]=false;b.classList.remove('down');};b.addEventListener('pointerup',up);b.addEventListener('pointerleave',up);b.addEventListener('pointercancel',up);});
 }
 
 /* ---------- 資料 ---------- */
@@ -700,7 +736,7 @@ function drawHUD(){
   txt('氣',20,66,11,'#ff8a5a');bar(38,58,200,8,P.ki/100,'#ff6a3a');
   const full=P.rage>=100,pulse=.6+.4*Math.sin(G.time*10);
   txt('怒',20,82,11,'#ffcf5a');bar(38,74,200,8,P.rage/100,full?`rgba(255,207,90,${pulse})`:'#a8742a');
-  if(full)txt('按 U 大絕招',246,82,12,`rgba(255,207,90,${pulse})`);
+  if(full)txt(touch.hidden?'按 U 大絕招':'按「絕」大絕招',246,82,12,`rgba(255,207,90,${pulse})`);
   let cx=20,cy=100;ctx.font=`900 12px ${FU}`;ctx.textAlign='left';
   for(const id in P.mods){const n=P.mods[id];if(!n)continue;const u=UPG_BY[id],s=u.name+'×'+n,w=ctx.measureText(s).width+12;
     if(cx>20&&cx+w>320){cx=20;cy+=18;}
@@ -850,7 +886,13 @@ function render(){
   if(G.flashA>0){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=`rgba(255,250,235,${G.flashA})`;ctx.fillRect(0,0,W,H);}
 }
 let last=performance.now();
-function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;G.time+=dt;step(dt);render();clk=null;for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
+const tb=k=>document.querySelector(`#btns [data-k="${k}"]`),bBlast=tb('blast'),bUlt=tb('ult');let tbLast='';
+function updTouch(){if(touch.hidden)return;const play=G.mode==='play'&&P;
+  const ki=play?Math.round(P.ki):0,rage=play?Math.round(P.rage):0,key=play+'|'+ki+'|'+rage;if(key===tbLast)return;tbLast=key;
+  touch.classList.toggle('off',!play);if(!play)return;
+  bBlast.style.setProperty('--p',ki/100);bBlast.classList.toggle('dim',ki<Math.max(4,12-3*m('sea')));
+  bUlt.style.setProperty('--p',rage/100);bUlt.classList.toggle('ready',rage>=100);bUlt.classList.toggle('dim',rage<100);}
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;G.time+=dt;step(dt);render();updTouch();clk=null;for(const k in pressed)delete pressed[k];requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
 if(location.hash==='#debug')window.__kx={G,get P(){return P;},enemies:()=>enemies,killAll(){enemies.filter(e=>e.dying===undefined).forEach(e=>killEnemy(e,0));}};
 cv.focus();
