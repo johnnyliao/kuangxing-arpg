@@ -28,9 +28,10 @@ canvas{width:100%;height:100%;display:block;border:1px solid var(--line);backgro
 #rot{display:none}
 /* 手機版：全螢幕橫向，左下搖桿、右下主攻擊鍵＋弧形技能鍵（MOBA 式） */
 body.mobile{padding:0;height:100dvh;overflow:hidden;justify-content:center;background:#000;gap:0}
-body.mobile #wrap{max-width:none;width:min(100vw,100dvh*16/9);position:static}
+body.mobile #wrap{max-width:none;width:min(100vw,100dvh*var(--ar,1.7778));aspect-ratio:var(--ar,1.7778);position:static}
 body.mobile canvas{border:0}
-body.mobile .bar{position:fixed;top:max(6px,env(safe-area-inset-top,0px));right:max(10px,env(safe-area-inset-right,0px));width:auto;z-index:3}
+body.mobile .bar{position:fixed;top:max(6px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:auto;z-index:3}
+body.mobile .voice-control,body.mobile #voice-test,body.mobile #voice-status{display:none}
 body.mobile #mute{padding:3px 8px;font-size:12px;opacity:.75}
 body.mobile #touch{position:fixed;inset:0;z-index:2}
 body.mobile #touch.off #stick,body.mobile #touch.off #btns{display:none}
@@ -44,7 +45,8 @@ body.mobile #touch.off #stick,body.mobile #touch.off #btns{display:none}
   background:radial-gradient(circle at 45% 35%,rgba(70,60,90,.85),rgba(15,10,25,.85) 70%);
   box-shadow:0 0 0 2px rgba(255,255,255,.28),0 4px 10px rgba(0,0,0,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;
   font:900 4.4vh/1 var(--ui);user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-#btns button::before{content:"";position:absolute;inset:-4px;border-radius:50%;z-index:-1;
+#btns button::before{content:"";position:absolute;inset:-4px;border-radius:50%;pointer-events:none;
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));
   background:conic-gradient(var(--c) calc(var(--p)*360deg),rgba(255,255,255,.12) 0)}
 #btns button small{font:700 1.9vh/1 var(--ui);margin-top:.5vh;opacity:.85;text-shadow:0 1px 2px #000}
 #btns button.down{transform:scale(.9);filter:brightness(1.4)}
@@ -92,7 +94,7 @@ body.mobile #touch.off #stick,body.mobile #touch.off #btns{display:none}
 <script>
 (()=>{
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-const W=960,H=540,TOP=310,BOT=515,TAU=Math.PI*2;
+let W=960;const H=540,TOP=310,BOT=515,TAU=Math.PI*2;
 const dpr=Math.min(2,window.devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;
 const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const FD='"Noto Serif TC","Songti TC",serif',FU='"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif';
@@ -272,10 +274,14 @@ addEventListener('keyup',e=>{const k=KEYMAP[e.code];if(k)keys[k]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;stopVoice();if(window.speechSynthesis)speechSynthesis.cancel();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const k in keys)keys[k]=false;stopVoice();if(window.speechSynthesis)speechSynthesis.cancel();}});
 let clk=null;
-cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();clk={x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};pressed.ok=true;audio();cv.focus();});
+cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect();clk={x:(e.clientX-r.left)*W/r.width-(W-960)/2,y:(e.clientY-r.top)*H/r.height};pressed.ok=true;audio();cv.focus();});
 const touch=document.getElementById('touch');
 if(matchMedia('(pointer:coarse)').matches||'ontouchstart' in window){
   touch.hidden=false;document.body.classList.add('mobile');
+  // 手機：戰鬥畫面寬度跟著螢幕比例（16:9～約 2.4:1），左右不留黑邊
+  const fit=()=>{W=Math.round(clamp(H*innerWidth/innerHeight,960,1300));cv.width=W*dpr;cv.height=H*dpr;
+    document.getElementById('wrap').style.setProperty('--ar',W/H);};
+  fit();addEventListener('resize',fit);
   const fs=()=>{const d=document.documentElement;if(!document.fullscreenElement&&d.requestFullscreen)
     d.requestFullscreen().then(()=>screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape')).catch(()=>{});};
   addEventListener('pointerdown',fs,{once:true});
@@ -863,8 +869,8 @@ function strokeTxt(s,x,y,size,col,align,font){ctx.font=`900 ${size}px ${font||FD
 function drawSub(){
   if(!G.sub||G.mode==='story')return;
   const sp=SPEAK[G.sub.who]||SPEAK.hero;ctx.globalAlpha=clamp(G.sub.t*3,0,1);
-  ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(340,58,600,46);
-  txt(sp.name,352,76,12,sp.col);txt(G.sub.text,352,96,18,'#f1e6d8','left',FU,500);ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(W-620,58,600,46);
+  txt(sp.name,W-608,76,12,sp.col);txt(G.sub.text,W-608,96,18,'#f1e6d8','left',FU,500);ctx.globalAlpha=1;
 }
 function drawHUD(){
   txt('羅利',20,26,18,'#f1e6d8','left',FD);txt('Lv.'+(G.stage*10+12)+(P.berserk?'　暴走':''),70,26,13,P.berserk?'#ffc23a':'#8f8296');
@@ -1019,6 +1025,13 @@ function drawEnding(){
 function render(){
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
   if(G.shake>0)ctx.translate(rnd(-G.shake,G.shake),rnd(-G.shake,G.shake));
+  if(G.mode!=='play'&&W!==960){ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+    const W0=W;ctx.save();ctx.translate((W-960)/2,0);ctx.beginPath();ctx.rect(0,0,960,H);ctx.clip();W=960;
+    try{drawMenu();}finally{W=W0;ctx.restore();}
+  }else drawMenu();
+  if(G.flashA>0){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=`rgba(255,250,235,${G.flashA})`;ctx.fillRect(0,0,W,H);}
+}
+function drawMenu(){
   switch(G.mode){
     case'title':drawTitle();break;
     case'story':drawStory();break;
@@ -1028,7 +1041,6 @@ function render(){
     case'dead':drawDead();break;
     case'ending':drawEnding();drawSub();break;
   }
-  if(G.flashA>0){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=`rgba(255,250,235,${G.flashA})`;ctx.fillRect(0,0,W,H);}
 }
 let last=performance.now();
 const tb=k=>document.querySelector(`#btns [data-k="${k}"]`),bBlast=tb('blast'),bUlt=tb('ult');let tbLast='';
